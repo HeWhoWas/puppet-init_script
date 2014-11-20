@@ -33,6 +33,7 @@ init_script { 'ffmpeg_input':
   daemon_env_setup  =>	    'ALSA_ENABLE=false',
   
 }
+```
 
 ### Paramaters
 ####Required
