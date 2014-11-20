@@ -1,0 +1,17 @@
+[Unit]
+Description=<%= daemon_desc %>
+After=syslog.target
+After=network.target
+
+[Service]
+Type=simple
+User=<%= daemon_user %>
+Group=<%= daemon_group %>
+ExecStart=<%= daemon_path %>/<%= daemon_bin %> <%= daemon_opts %>
+
+# Give a reasonable amount of time for the server to start up/shut down
+TimeoutSec=<%= daemon_timeout %>
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,8 @@
+name         'hewhowas-init_script'
+version      '1.0.0'
+source       'http://github.com/HeWhoWas/puppet-init_script'
+author       'Ben Bettridge'
+license      'Apache License, Version 2.0'
+summary      'Creation of init scripts for lsb&chkconfig'
+description  'Create init scripts for generic long-running services.'
+project_page 'http://github.com/HeWhoWas/puppet-init_script'

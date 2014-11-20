@@ -1,0 +1,210 @@
+#!/bin/bash
+# <%= daemon_name %> daemon
+# chkconfig: <%= chkconfig %>
+# description: <%= daemon_desc %> 
+# processname: <%= daemon_name %>
+### BEGIN INIT INFO
+# Provides: <%= daemon_name %>
+# Required-Start: <%= deamon_required_start %>
+### END INIT INFO
+
+DAEMON_PATH="<%= daemon_path %>"
+
+DAEMON=<%= daemon_bin %>
+DAEMONOPTS="<%= daemon_opts %>"
+
+NAME=<%= daemon_name %>
+DESC="<%= daemon_desc %>"
+LOGFILE=<%= daemon_logfile %>
+SCRIPTNAME=/etc/init.d/$NAME
+USER=<%= daemon_user %>
+
+<% if @external_pid %>
+PIDFILE="<%= @external_pid %>"
+<% else %>
+PIDFILE="/var/run/$NAME.pid"
+<% end %>
+
+START_CMD="$DAEMON_PATH/$DAEMON $DAEMONOPTS > $LOGFILE 2>&1"
+<% if @daemon_env_setup %>
+DAEMON_ENV_SETUP="<%= @daemon_env_setup %>"
+START_CMD="$DAEMON_ENV_SETUP & $START_CMD"
+<% end %>
+<% if @daemon_user %>
+  <% if @external_pid %>
+START_CMD="su -l $USER -c \"$START_CMD\""
+  <% else %>
+START_CMD="su -l $USER -c \"$START_CMD & echo \$!\""
+  <% end %>
+<% else %>
+  <% if @external_pid %>
+START_CMD="$START_CMD"
+  <% else %>
+START_CMD="$START_CMD & echo \$!"
+  <% end %>
+<% end %>
+
+#echo $START_CMD
+
+#Kill process by PID read from PIDFILE. Can contain multiple PID's seperated by space.
+#
+#Requires:
+#  PIDFILE
+function kill_procs_by_id() {
+        if [ -z "$1" ]; then
+                echo "No PIDFILE specified"
+                exit
+        fi
+        local PIDFILE=$1
+	PID=`cat $PIDFILE`
+        if [ -f $PIDFILE ]; then
+        	kill -HUP $PID
+       		printf "%s\n" "Ok"
+        	rm -f $PIDFILE
+        else
+        	printf "%s\n" "pidfile not found"
+        fi
+}
+
+#Kill multiple process by PROCNAME and PROCARGS
+#
+#Requires: 
+#  PROCNAME
+#
+#Optional:
+#  PROCARGS
+#
+#Returns:
+#  STRING - The PIDS of all processes killed, if any. Empty STRING if none found.
+function kill_procs_by_name() {
+        if [ -z "$1" ]; then
+		echo "No PROCNAME specified to kill."
+                exit
+        fi
+
+        local PROCNAME = $1
+        local PROCARGS = $2
+        local PIDS=`pgrep -f $PROCNAME $PROCARGS`
+        if [ -z "$PIDS" ]; then
+                return ""
+        fi
+
+        for PID in $PIDS; do
+        	KILL -HUP $PID
+        done
+	return $PIDS
+}
+
+#Checks a process by PID read from PIDFILE. Can contain multiple PID's seperated by space.
+#
+#Requires:
+#  PIDFILE
+#
+#Returns:
+#  TRUE if process is running.
+#  FALSE if process is not running.
+function check_proc_by_id() {
+	if [ -z "$1" ]; then
+                echo "No PIDFILE specified to check"
+                exit
+        fi
+	local PIDFILE=$1
+	local PID=`cat $PIDFILE`
+	if ps -p $PID > /dev/null 2>&1; then
+		return 0
+	else
+		return 1
+	fi
+}
+
+#Checks a process by PROCNAME and PROCARGS
+#
+#Requires:
+#  PIDFILE
+#
+#Returns:
+#  INTEGER - The number of processes found running, if any.
+function check_proc_by_name() {
+	if [ -z "$1" ]; then
+                echo "No PROCNAME specified to kill."
+                exit
+        fi
+        local PROCNAME = $1
+        local PROCARGS = $2
+	PIDS=`pgrep -f $PROCNAME $PROCARGS`
+        if [ -z "$PIDS" ]; then
+		return 0
+        fi
+        i=0
+	for PID in $PIDS; do
+		i=$((i+1))
+	done
+	return $i
+}
+
+function check_running_as_root() {
+  U=`id -nu`
+  if [ $U != "root" ]; then
+	return 1
+  else
+	return 0
+  fi
+}
+
+check_running_as_root
+
+case "$1" in
+start)
+	if [ -f $PIDFILE ]; then
+            PID=`cat $PIDFILE`
+            if ps -p $PID > /dev/null 2>&1; then
+		printf "%s\n" "Service already running"
+		exit 
+            fi
+        fi
+	printf "%-50s" "Starting $NAME..."
+        <% if @external_pid %>
+          eval "$START_CMD"
+          PID=`cat $PIDFILE`
+#          echo "Read External PID" $PID " from " $PIDFILE
+        <% else %>
+          PID=`$START_CMD`
+#          echo "Saving PID" $PID " to " $PIDFILE
+        <% end %>
+        if [ -z $PID ]; then
+            printf "%s\n" "Fail"
+        else
+            echo $PID > $PIDFILE
+            printf "%s\n" "Ok"
+        fi
+;;
+status)
+        printf "%-50s" "Checking $NAME..."
+        if [ -f $PIDFILE ]; then
+            if check_proc_by_id $PIDFILE; then
+                echo "Running"
+                exit 0
+            else
+                printf "%s\n" "Process dead but pidfile exists"
+                exit 2
+            fi
+        else
+            printf "%s\n" "Service not running"
+            exit 1
+        fi
+;;
+stop)
+        printf "%-50s" "Stopping $NAME"
+	kill_procs_by_id
+;;
+
+restart)
+  	$0 stop
+  	$0 start
+;;
+
+*)
+        echo "Usage: $0 {status|start|stop|restart}"
+        exit 1
+esac
+
